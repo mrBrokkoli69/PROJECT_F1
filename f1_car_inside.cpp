@@ -15,7 +15,8 @@ private:
     const double max_torque = 500.0;
     const double peak_rpm = 11000.0;
     const double null_rpm = 4000.0;
-    
+    const double back_wheel_radius = 0.371;
+    const double front_wheel_radius = 0.330;
     const std::vector<double> gear_ratios = {
         3.0,   // 1-я
         2.4,   // 2-я
@@ -34,7 +35,10 @@ private:
     double torque = 0;
     double rpm_wheels = 0;
     double torque_wheels = 0;
-    double traction_force = 0;
+    
+    //Сила тяги на передних и задних колесах
+    double back_traction_force = 0;
+    double front_traction_force = 0;
     
     double gear_factor = gear_ratios[gear-1] * final_drive_ratio;
 
@@ -53,6 +57,8 @@ public:
         gear_factor = gear_ratios[gear-1] * final_drive_ratio;
         rpm_wheels = rpm / gear_factor;
         torque_wheels = torque * gear_factor;
+        back_traction_force = torque_wheels / back_wheel_radius;
+        front_traction_force = torque_wheels / front_wheel_radius;
     }
     
     void calculate_rpm(bool pedal_pos, double dt) {
@@ -111,7 +117,6 @@ public:
                 gear_factor = gear_ratios[gear-1] * final_drive_ratio;
                 rpm = current_wheel_rpm * gear_factor;
                 
-                // Защита от превышения RPM при понижении передачи
                 if (rpm > max_rpm) {
                     rpm = max_rpm;
                 }
