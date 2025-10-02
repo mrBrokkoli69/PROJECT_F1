@@ -16,6 +16,10 @@ private:
     const double peak_rpm = 11000.0;
     const double null_rpm = 4000.0;
     const double wheel_radius = 0.330;
+    const double brake_factor_coef = 1.0;
+    const double brake_rate = 1000.0;
+    
+    const double dt = 0.01;
     
     const std::vector<double> gear_ratios = {
         3.0,   // 1-я
@@ -37,6 +41,7 @@ private:
     double torque_wheels = 0;
     double traction_force = 0;
     
+    double brake_factor = 0;
     double gear_factor = gear_ratios[gear-1] * final_drive_ratio;
 
 public:
@@ -50,6 +55,18 @@ public:
         }
     }
     
+    void calculate_brake_factor(bool brake_position) {
+        if (brake_position) {
+            if (brake_factor + brake_factor_coef*dt <= 1) {
+                brake_factor = brake_factor + brake_factor_coef*dt;
+            }
+        } else {
+            if (brake_factor - brake_factor_coef*dt >= 0) {
+                brake_factor = brake_factor - brake_factor_coef*dt;
+            }
+        }
+    }
+    
     void calculate_wheels() {
         gear_factor = gear_ratios[gear-1] * final_drive_ratio;
         rpm_wheels = rpm / gear_factor;
@@ -57,7 +74,7 @@ public:
         traction_force = torque_wheels / wheel_radius;
     }
     
-    void calculate_rpm(bool pedal_pos, double dt) {
+    void calculate_rpm(bool pedal_pos) {
         if (pedal_pos) {
             rpm = rpm + dt * sigma_factor();
             if (rpm > max_rpm) {
@@ -84,18 +101,21 @@ public:
         }
     }
     
-    void calculate_params(bool ped_pos) {
-        // Дифференциальное время
-        const double diff_t = 0.01;
+    void brake() {
+        if (brake_factor == 0) { calculate_brake_factor(true); }
         
-        calculate_rpm(ped_pos, diff_t);
-        calculate_torque();
-        calculate_wheels();
+        if (rpm_wheels - brake_factor * brake_rate * dt >= 0) {
+            
+            rpm_wheels = rpm_wheels - brake_factor * brake_rate * dt;
+            rpm = rpm_wheels * gear_factor;
+        
+            calculate_torque();
+            calculate_wheels();
+        }
+        
     }
     
     void change_gear(bool up_or_down) {
-        // Сохраняем текущие обороты колес для синхронизации
-        double current_wheel_rpm = rpm_wheels;
         
         if (up_or_down) {
             // Повышение передачи
@@ -103,7 +123,7 @@ public:
                 gear++;
                 // Синхронизируем RPM двигателя с новым передаточным числом
                 gear_factor = gear_ratios[gear-1] * final_drive_ratio;
-                rpm = current_wheel_rpm * gear_factor;
+                rpm = rpm_wheels * gear_factor;
             } 
         } else {
             // Понижение передачи
@@ -111,9 +131,9 @@ public:
                 
                 gear_factor = gear_ratios[gear-2] * final_drive_ratio;
                 
-                if (current_wheel_rpm * gear_factor <= max_rpm) {
+                if (rpm_wheels * gear_factor <= max_rpm) {
                        gear--;
-                       rpm = current_wheel_rpm * gear_factor;
+                       rpm = rpm_wheels * gear_factor;
                 }
                 
                 
@@ -122,6 +142,20 @@ public:
         
         calculate_torque();
         calculate_wheels();
+    }
+    
+    void calculate_params(bool gas_pos, bool brake_pos) {
+        
+        calculate_rpm(gas_pos);
+        calculate_torque();
+        calculate_wheels();
+        if (brake_factor > 0) {
+            calculate_brake_factor(brake_pos);
+        }
+        if (brake_pos) {
+            brake();
+        }
+        
     }
     
     // Геттеры
@@ -151,12 +185,13 @@ int main() {
     
     std::atomic<bool> running(true);
     std::atomic<bool> gas_pressed(false);
+    std::atomic<bool> brake_pressed(false);
     
     // Поток для обновления оборотов
     std::thread engine_thread([&]() {
         while (running) {
             // Используем метод calculate_params для обновления всех параметров
-            f1_engine.calculate_params(gas_pressed);
+            f1_engine.calculate_params(gas_pressed, brake_pressed);
             std::this_thread::sleep_for(std::chrono::milliseconds(10)); // dt = 0.01 секунды
         }
     });
@@ -180,10 +215,11 @@ int main() {
         
         mvprintw(12, 0, "Controls:");
         mvprintw(13, 0, "W - Hold for gas");
-        mvprintw(14, 0, "R - Reset RPM");
-        mvprintw(15, 0, "LEFT - Shift down");
-        mvprintw(16, 0, "RIGHT - Shift up");
-        mvprintw(17, 0, "ESC - Exit");
+        mvprintw(14, 0, "S - Hold for brake");
+        mvprintw(15, 0, "R - Reset RPM");
+        mvprintw(16, 0, "LEFT - Shift down");
+        mvprintw(17, 0, "RIGHT - Shift up");
+        mvprintw(18, 0, "ESC - Exit");
         
         // Обработка ввода
         int ch = getch();
@@ -200,6 +236,12 @@ int main() {
                 f1_engine.set_rpm(0.0);
                 gas_pressed = false;
                 break;
+            case 's': // S - тормоз
+            case 'S':
+                if (!brake_pressed) {
+                    brake_pressed = true;
+                }
+                break;
             case KEY_LEFT: // Стрелка влево - понижение передачи
                 f1_engine.change_gear(false); // false = downshift
                 break;
@@ -214,6 +256,10 @@ int main() {
         // Если W отпущена
         if (ch != 'w' && ch != 'W' && gas_pressed) {
             gas_pressed = false;
+        }
+        
+        if (ch != 's' && ch != 'S' && brake_pressed) {
+            brake_pressed = false;
         }
         
         refresh();
