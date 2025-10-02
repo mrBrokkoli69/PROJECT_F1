@@ -206,7 +206,7 @@ double F1PhysicsEngine::calculateDownForce() const {
 
 double F1PhysicsEngine::calculateBrakeForce() const {
     // Используем brake_factor для расчета силы торможения
-    return current_state.brake_factor * params.max_brake_force;
+    return -current_state.brake_factor * params.max_brake_force;
 }
 
 void F1PhysicsEngine::integrateMotion(double dt) {
