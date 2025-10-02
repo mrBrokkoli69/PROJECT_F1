@@ -168,7 +168,7 @@ public:
     double get_gear_ratio() const { return gear_ratios[gear-1]; }
     double get_final_drive() const { return final_drive_ratio; }
     double get_total_ratio() const { return gear_factor; }
-    
+    double get_traction_force() const ( return traction_force; }
     void set_rpm(double new_rpm) { rpm = new_rpm; }
 };
 
