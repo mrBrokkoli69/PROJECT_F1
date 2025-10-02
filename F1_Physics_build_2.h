@@ -39,7 +39,7 @@ public:
         double wheel_rpm = 0.0;
         double wheel_torque = 0.0;
         int current_gear = 1;
-        double traction_force = 0.0;
+        
         
         // Силы
         double traction_force = 0.0;
