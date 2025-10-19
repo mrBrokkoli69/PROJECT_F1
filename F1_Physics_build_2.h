@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <array>
+#include <cmath>
 
 class F1PhysicsEngine {
 public:
@@ -27,11 +28,22 @@ public:
         double speed;               // Модуль скорости [м/с]
         
         // Вращательное движение  
-        double angle = 0.0;         // Угол поворота автомобиля [рад]
+        double car_angle = 0.0;         // Угол поворота автомобиля [рад]
         double angular_velocity = 0.0;  // Угловая скорость [рад/с]
+        double steering_wheel = 0.0;    // Угол поворота руля
+        double rotation_radius = 0.0;   // радиус кривизны поворота
+        
+        // Нагрузки
+        std::array<double, 4> wheel_loads; // нагрузка распределенная по колесам
         
         // Колеса (0=FL, 1=FR, 2=RL, 3=RR)
         std::array<Point2D, 4> wheel_positions;    // Позиции колес
+        std::array<Vector2D, 4> wheel_velocity;    // Скорости колес
+        std::array<Vector2D, 4> wheel_acceleration; // Ускорения колес
+        std::array<double, 4> wheel_slip_angle;    // угол скольжения каждого колеса
+
+        // Силы на колеса:
+        std::array<Vector2D, 4> wheel_forces;      // x - продольная, y - поперечная
         
         // Двигатель и трансмиссия
         double engine_rpm = 0.0;
@@ -40,12 +52,13 @@ public:
         double wheel_torque = 0.0;
         int current_gear = 1;
         
-        
         // Силы
         double traction_force = 0.0;
         double drag_force = 0.0;
         double brake_force = 0.0;
         double down_force = 0.0;
+        std::array<double, 4> side_force;          // Боковые силы
+        std::array<double, 4> centr_force;         // Центробежные силы
         
         // Тормозная система
         double brake_factor = 0.0;
@@ -79,13 +92,21 @@ private:
         double drag_coefficient = 0.9;  // Коэффициент лобового сопротивления
         double frontal_area = 1.5;      // Фронтальная площадь [м²]
         double air_density = 1.225;     // Плотность воздуха [кг/м³]
-        const double downforce_coefficient = -3.0; // Коэффициент прижимной силы 
+        double downforce_coefficient = -3.0; // Коэффициент прижимной силы 
         
         // === ШИНЫ И ТОРМОЗА ===
         double tire_friction = 1.5;     // Коэффициент трения шин
         double max_brake_force = 15000.0; // Максимальная сила торможения [Н]
         double brake_factor_coef = 1.0; // Коэффициент торможения
         double brake_rate = 1000.0;     // Скорость торможения
+        
+        // === ПОВОРОТ И ШИНЫ ===
+        double k_front = 80000.0;       // Жесткость передних шин [Н/рад]
+        double k_rear = 60000.0;        // Жесткость задних шин [Н/рад]
+        double mu_front = 1.6;          // Трение передних шин
+        double mu_rear = 1.4;           // Трение задних шин
+        double stiffness = 0.2;         // Коэффициент упругости подвески
+        double max_steering_angle = 0.5; // Макс угол руля [рад]
     };
     
     CarParameters params;
@@ -100,7 +121,8 @@ public:
     // === ПУБЛИЧНЫЙ ИНТЕРФЕЙС ===
     
     // Основной метод обновления физики
-    void update(double dt, bool gas_pedal, bool brake_pedal, double steering = 0.0);
+    void update(double dt, bool gas_pedal, bool brake_pedal, double steering_wheel = 0.0);
+    Point2D calculateIdealWheelPosition(int wheel_index);
     
     // Управление передачами
     void shiftUp();
@@ -108,6 +130,7 @@ public:
     
     // === ГЕТТЕРЫ для отрисовки ===
     const CarState& getState() const { return current_state; }
+   
 
 private:
     // === ПРИВАТНЫЕ МЕТОДЫ РАСЧЕТА ===
@@ -121,18 +144,27 @@ private:
     void applyBrakes(double dt);
     double sigmaFactor() const;
     
-    // Силы
+    // Силы центра масс
     void calculateForces(bool gas_pedal, bool brake_pedal, double steering);
     double calculateTractionForce() const;
     double calculateDragForce() const;
     double calculateDownForce() const;
     double calculateBrakeForce() const;
     
-    // Движение
-    void integrateMotion(double dt);
+    // Силы поворота
+    void calculateRotationForces(double dt);
+    void calculateWheelLoads();
+    void calculateAngularVelocity();
+    void calculateWheelSlipAngle(double dt);
+    void calculateRotationRadius();
+    void calculateSideForce();
+    void calculateCentrForce();
+    void calculateWheelForces();
     
-    // Геометрия
-    void calculateWheelPositions();
+    // Движение и геометрия
+    void integrateMotion(double dt);
+    void checkRealPosition();
+    
 };
 
 #endif // F1_PHYSICS_H
