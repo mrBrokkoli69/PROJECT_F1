@@ -88,7 +88,6 @@ void F1PhysicsEngine::calculateTorque() {
 
 void F1PhysicsEngine::calculateWheelParameters() {
     double gear_factor = params.gear_ratios[current_state.current_gear - 1] * params.final_drive;
-    current_state.wheel_rpm = current_state.engine_rpm / gear_factor;
     current_state.wheel_torque = current_state.engine_torque * gear_factor;
     current_state.traction_force = current_state.wheel_torque / params.wheel_radius;
 }
@@ -158,7 +157,8 @@ void F1PhysicsEngine::calculateForces(bool gas_pedal, bool brake_pedal, double s
 
     current_state.steering_wheel = steering;
 
-    current_state.traction_force = gas_pedal ? calculateTractionForce() : 0.0;
+   // current_state.traction_force = gas_pedal ? calculateTractionForce() : 0.0;
+    
     current_state.drag_force = calculateDragForce();
     current_state.brake_force = brake_pedal ? calculateBrakeForce() : 0.0;
     current_state.down_force = calculateDownForce();
